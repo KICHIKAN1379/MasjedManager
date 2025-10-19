@@ -531,7 +531,7 @@ def main():
     
     page = st.sidebar.selectbox(
         "انتخاب صفحه:",
-        ["مدیریت اعضا", "امتیازدهی"],
+        ["مدیریت اعضا", "امتیازدهی", "گزارش‌ها و پشتیبان"],
         index=0
     )
     
@@ -562,6 +562,181 @@ def main():
         member_management_page()
     elif page == "امتیازدهی":
         scoring_page()
+    elif page == "گزارش‌ها و پشتیبان":
+        reports_and_backup_page()
+
+def reports_and_backup_page():
+    """Reports and backup page"""
+    st.markdown("""
+    <div class="mosque-header">
+        <h1>📊 گزارش‌ها و پشتیبان‌گیری</h1>
+        <p>خروجی گزارش‌ها و مدیریت پشتیبان داده‌ها</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown('<div class="rtl">', unsafe_allow_html=True)
+    
+    # Export section
+    st.subheader("📥 خروجی گزارش‌ها")
+    
+    members = data_manager.get_all_members()
+    
+    if not members:
+        st.info("هیچ داده‌ای برای خروجی گرفتن وجود ندارد.")
+    else:
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**📋 خروجی اطلاعات اعضا (CSV)**")
+            st.write(f"تعداد اعضا: {len(members)}")
+            
+            # Prepare data for CSV
+            export_data = []
+            for member in members:
+                level, _, _ = get_level_info(member.get('points', 0))
+                export_data.append({
+                    'نام': member['first_name'],
+                    'نام خانوادگی': member['last_name'],
+                    'تاریخ تولد': member.get('birth_date', ''),
+                    'مسئولیت': member.get('responsibility', ''),
+                    'توضیحات': member.get('description', ''),
+                    'امتیاز': member.get('points', 0),
+                    'سطح': level
+                })
+            
+            df = pd.DataFrame(export_data)
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            
+            st.download_button(
+                label="💾 دانلود فایل CSV",
+                data=csv,
+                file_name=f"members_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                type="primary"
+            )
+        
+        with col2:
+            st.write("**📈 خروجی گزارش امتیازات**")
+            st.write(f"مجموع امتیازات همه اعضا: {sum(m.get('points', 0) for m in members)}")
+            
+            # Prepare scoring report
+            scoring_data = []
+            for i, member in enumerate(sorted(members, key=lambda x: x.get('points', 0), reverse=True)):
+                level, _, _ = get_level_info(member.get('points', 0))
+                badges = get_achievement_badges(level)
+                badge_names = ', '.join([b['name'] for b in badges]) if badges else 'ندارد'
+                
+                scoring_data.append({
+                    'رتبه': i + 1,
+                    'نام و نام خانوادگی': f"{member['first_name']} {member['last_name']}",
+                    'امتیاز': member.get('points', 0),
+                    'سطح': level,
+                    'نشان‌ها': badge_names,
+                    'تعداد تغییرات': len(member.get('points_history', []))
+                })
+            
+            df = pd.DataFrame(scoring_data)
+            csv = df.to_csv(index=False, encoding='utf-8-sig')
+            
+            st.download_button(
+                label="💾 دانلود گزارش امتیازات",
+                data=csv,
+                file_name=f"scoring_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                type="primary"
+            )
+    
+    st.divider()
+    
+    # Backup section
+    st.subheader("💾 پشتیبان‌گیری و بازیابی")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**📦 ایجاد پشتیبان**")
+        st.write("ایجاد یک نسخه پشتیبان از تمام داده‌های سیستم")
+        
+        # Prepare backup data directly for download
+        backup_filename = f"members_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        backup_content = json.dumps(data_manager.get_all_members(), ensure_ascii=False, indent=2)
+        
+        st.download_button(
+            label="💾 دانلود فایل پشتیبان",
+            data=backup_content,
+            file_name=backup_filename,
+            mime="application/json",
+            type="primary"
+        )
+        
+        st.info("💡 فایل پشتیبان شامل تمام اطلاعات اعضا، امتیازات و تاریخچه است.")
+    
+    with col2:
+        st.write("**♻️ بازیابی از پشتیبان**")
+        st.write("بازگردانی داده‌ها از یک فایل پشتیبان")
+        
+        uploaded_backup = st.file_uploader(
+            "انتخاب فایل پشتیبان (JSON)",
+            type=['json'],
+            key="backup_restore"
+        )
+        
+        if uploaded_backup:
+            st.warning("⚠️ توجه: بازیابی از پشتیبان، تمام داده‌های فعلی را جایگزین می‌کند!")
+            
+            if st.button("بازیابی داده‌ها", type="secondary"):
+                # Save uploaded file temporarily
+                temp_backup = "temp_restore_backup.json"
+                with open(temp_backup, 'wb') as f:
+                    f.write(uploaded_backup.getbuffer())
+                
+                if data_manager.restore_data(temp_backup):
+                    st.success("✅ داده‌ها با موفقیت بازیابی شد!")
+                    os.remove(temp_backup)
+                    st.rerun()
+                else:
+                    st.error("❌ خطا در بازیابی داده‌ها!")
+                    if os.path.exists(temp_backup):
+                        os.remove(temp_backup)
+    
+    st.divider()
+    
+    # Statistics section
+    st.subheader("📊 آمار کلی")
+    
+    if members:
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("تعداد کل اعضا", len(members))
+        
+        with col2:
+            total_points = sum(m.get('points', 0) for m in members)
+            st.metric("مجموع امتیازات", total_points)
+        
+        with col3:
+            avg_points = total_points / len(members) if members else 0
+            st.metric("میانگین امتیازات", f"{avg_points:.1f}")
+        
+        with col4:
+            max_level = max([get_level_info(m.get('points', 0))[0] for m in members])
+            st.metric("بالاترین سطح", max_level)
+        
+        # Level distribution chart
+        st.write("**📈 توزیع اعضا بر اساس سطح**")
+        level_counts = {}
+        for member in members:
+            level, _, _ = get_level_info(member.get('points', 0))
+            level_counts[level] = level_counts.get(level, 0) + 1
+        
+        level_df = pd.DataFrame([
+            {'سطح': f'سطح {level}', 'تعداد': count}
+            for level, count in sorted(level_counts.items())
+        ])
+        
+        st.bar_chart(level_df.set_index('سطح'))
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
