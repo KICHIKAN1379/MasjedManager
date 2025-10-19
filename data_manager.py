@@ -77,17 +77,46 @@ class DataManager:
             print(f"Error updating member: {e}")
             return False
     
-    def update_member_points(self, index: int, new_points: int) -> bool:
-        """Update a member's points"""
+    def update_member_points(self, index: int, new_points: int, reason: str = "") -> bool:
+        """Update a member's points and log the change"""
         try:
             self.members = self._load_data()
             if 0 <= index < len(self.members):
+                old_points = self.members[index].get('points', 0)
                 self.members[index]['points'] = max(0, new_points)  # Ensure points don't go negative
+                
+                # Initialize history if it doesn't exist
+                if 'points_history' not in self.members[index]:
+                    self.members[index]['points_history'] = []
+                
+                # Add history entry
+                from datetime import datetime
+                change = new_points - old_points
+                history_entry = {
+                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    'old_points': old_points,
+                    'new_points': new_points,
+                    'change': change,
+                    'reason': reason
+                }
+                self.members[index]['points_history'].append(history_entry)
+                
                 return self._save_data()
             return False
         except Exception as e:
             print(f"Error updating member points: {e}")
             return False
+    
+    def get_member_history(self, index: int) -> list:
+        """Get points history for a specific member"""
+        try:
+            self.members = self._load_data()
+            if 0 <= index < len(self.members):
+                return self.members[index].get('points_history', [])
+            return []
+        except Exception as e:
+            print(f"Error getting member history: {e}")
+            return []
     
     def delete_member(self, index: int) -> bool:
         """Delete a member"""

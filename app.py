@@ -83,6 +83,93 @@ def get_score_bar_color(progress_percent):
     else:
         return "#44ff44"  # Green
 
+def get_achievement_badges(level):
+    """Get achievement badges based on level"""
+    badges = []
+    
+    if level >= 1:
+        badges.append({"name": "آغازگر", "emoji": "🌟", "description": "رسیدن به سطح ۱"})
+    if level >= 3:
+        badges.append({"name": "پیشرو", "emoji": "⭐", "description": "رسیدن به سطح ۳"})
+    if level >= 5:
+        badges.append({"name": "فعال", "emoji": "✨", "description": "رسیدن به سطح ۵"})
+    if level >= 10:
+        badges.append({"name": "نمونه", "emoji": "🏆", "description": "رسیدن به سطح ۱۰"})
+    if level >= 15:
+        badges.append({"name": "ستاره", "emoji": "💎", "description": "رسیدن به سطح ۱۵"})
+    if level >= 20:
+        badges.append({"name": "قهرمان", "emoji": "👑", "description": "رسیدن به سطح ۲۰"})
+    
+    return badges
+
+def generate_certificate_html(member_name, level, points, date):
+    """Generate HTML certificate for a member"""
+    return f"""
+    <div style="
+        width: 800px;
+        height: 600px;
+        border: 10px solid #1f5f3f;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #f0f8f0, #ffffff);
+        padding: 40px;
+        text-align: center;
+        font-family: 'Tahoma', sans-serif;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        margin: 20px auto;
+    ">
+        <div style="margin-bottom: 30px;">
+            <svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="10" y="60" width="80" height="30" fill="#1f5f3f" rx="2"/>
+                <rect x="20" y="50" width="10" height="30" fill="#2d8a4f"/>
+                <rect x="70" y="50" width="10" height="30" fill="#2d8a4f"/>
+                <circle cx="25" cy="45" r="8" fill="#1f5f3f"/>
+                <circle cx="75" cy="45" r="8" fill="#1f5f3f"/>
+                <rect x="24" y="37" width="2" height="15" fill="#2d8a4f"/>
+                <rect x="74" y="37" width="2" height="15" fill="#2d8a4f"/>
+                <path d="M30 60 L50 40 L70 60" fill="#1f5f3f"/>
+                <rect x="45" y="65" width="10" height="20" fill="#8B4513"/>
+                <circle cx="50" cy="30" r="12" fill="#FFD700"/>
+                <path d="M50 18 L52 26 L50 30 L48 26 Z" fill="#FFD700"/>
+            </svg>
+        </div>
+        
+        <h1 style="color: #1f5f3f; font-size: 48px; margin: 20px 0; direction: rtl;">گواهینامه تقدیر</h1>
+        
+        <div style="margin: 40px 0; direction: rtl;">
+            <p style="font-size: 24px; color: #2c3e2c; margin: 20px 0;">
+                این گواهینامه به
+            </p>
+            <h2 style="color: #1f5f3f; font-size: 40px; margin: 20px 0; font-weight: bold;">
+                {member_name}
+            </h2>
+            <p style="font-size: 24px; color: #2c3e2c; margin: 20px 0;">
+                اهدا می‌گردد
+            </p>
+        </div>
+        
+        <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; margin: 30px 0; direction: rtl;">
+            <p style="font-size: 20px; color: #1f5f3f; margin: 10px 0;">
+                🏆 <strong>سطح {level}</strong> - <strong>{points} امتیاز</strong>
+            </p>
+            <p style="font-size: 18px; color: #2d8a4f; margin: 10px 0;">
+                به پاس تعهد و فعالیت در گروه مسجدی
+            </p>
+        </div>
+        
+        <div style="margin-top: 40px; direction: rtl;">
+            <p style="font-size: 16px; color: #666;">
+                تاریخ صدور: {date}
+            </p>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <div style="display: inline-block; border-top: 2px solid #1f5f3f; padding-top: 10px; width: 200px;">
+                <p style="color: #1f5f3f; font-size: 16px;">مسئول گروه</p>
+            </div>
+        </div>
+    </div>
+    """
+
 def render_score_bar(points, max_points_for_level):
     """Render animated score bar"""
     level, points_in_level, points_for_next = get_level_info(points)
@@ -108,6 +195,29 @@ def render_score_bar(points, max_points_for_level):
     """, unsafe_allow_html=True)
     
     return level
+
+def save_uploaded_photo(uploaded_file, member_index):
+    """Save uploaded photo and return the file path"""
+    try:
+        if uploaded_file is not None:
+            # Create photos directory if it doesn't exist
+            photos_dir = "member_photos"
+            if not os.path.exists(photos_dir):
+                os.makedirs(photos_dir)
+            
+            # Generate unique filename
+            file_extension = uploaded_file.name.split('.')[-1]
+            file_path = os.path.join(photos_dir, f"member_{member_index}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{file_extension}")
+            
+            # Save the file
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            
+            return file_path
+        return None
+    except Exception as e:
+        print(f"Error saving photo: {e}")
+        return None
 
 def member_management_page():
     """Member management page"""
@@ -135,15 +245,27 @@ def member_management_page():
     
     description = st.text_area("توضیحات", key="description")
     
+    # Photo upload
+    uploaded_photo = st.file_uploader("تصویر عضو (اختیاری)", type=['png', 'jpg', 'jpeg'], key="new_photo")
+    
     if st.button("افزودن عضو", type="primary"):
         if first_name and last_name:
+            # Get current member count for photo naming
+            member_count = data_manager.get_member_count()
+            
+            # Save photo if uploaded
+            photo_path = None
+            if uploaded_photo:
+                photo_path = save_uploaded_photo(uploaded_photo, member_count)
+            
             member_data = {
                 "first_name": first_name,
                 "last_name": last_name,
                 "birth_date": birth_date.strftime("%Y-%m-%d"),
                 "responsibility": responsibility,
                 "description": description,
-                "points": 0
+                "points": 0,
+                "photo_path": photo_path
             }
             
             if data_manager.add_member(member_data):
@@ -166,6 +288,12 @@ def member_management_page():
     else:
         for idx, member in enumerate(members):
             with st.expander(f"👤 {member['first_name']} {member['last_name']}"):
+                # Display current photo if exists
+                if member.get('photo_path') and os.path.exists(member['photo_path']):
+                    col_photo, col_info = st.columns([1, 3])
+                    with col_photo:
+                        st.image(member['photo_path'], width=150, caption="تصویر فعلی")
+                
                 col1, col2, col3 = st.columns([2, 2, 1])
                 
                 with col1:
@@ -181,15 +309,24 @@ def member_management_page():
                 
                 new_description = st.text_area("توضیحات", value=member.get('description', ''), key=f"edit_desc_{idx}")
                 
+                # Photo upload for editing
+                new_photo = st.file_uploader("تغییر تصویر (اختیاری)", type=['png', 'jpg', 'jpeg'], key=f"edit_photo_{idx}")
+                
                 with col3:
                     if st.button("ویرایش", key=f"edit_{idx}", type="secondary"):
+                        # Save new photo if uploaded
+                        photo_path = member.get('photo_path')
+                        if new_photo:
+                            photo_path = save_uploaded_photo(new_photo, idx)
+                        
                         updated_member = {
                             "first_name": new_first_name,
                             "last_name": new_last_name,
                             "birth_date": new_birth_date.strftime("%Y-%m-%d"),
                             "responsibility": new_responsibility,
                             "description": new_description,
-                            "points": member.get('points', 0)
+                            "points": member.get('points', 0),
+                            "photo_path": photo_path
                         }
                         
                         if data_manager.update_member(idx, updated_member):
@@ -234,7 +371,13 @@ def scoring_page():
             </div>
             """, unsafe_allow_html=True)
             
-            col1, col2, col3, col4 = st.columns([2, 3, 1, 1])
+            # Create columns - add photo column if photo exists
+            if member.get('photo_path') and os.path.exists(member['photo_path']):
+                col_photo, col1, col2, col3, col4 = st.columns([1, 2, 3, 1, 1])
+                with col_photo:
+                    st.image(member['photo_path'], width=100)
+            else:
+                col1, col2, col3, col4 = st.columns([2, 3, 1, 1])
             
             with col1:
                 current_points = member.get('points', 0)
@@ -247,6 +390,12 @@ def scoring_page():
                 """, unsafe_allow_html=True)
                 
                 st.write(f"**مجموع امتیازات:** {current_points}")
+                
+                # Display achievement badges
+                badges = get_achievement_badges(level)
+                if badges:
+                    badge_text = " ".join([f"{badge['emoji']}" for badge in badges])
+                    st.markdown(f"**نشان‌ها:** {badge_text}")
             
             with col2:
                 st.write("**نوار پیشرفت:**")
@@ -254,36 +403,97 @@ def scoring_page():
             
             with col3:
                 if st.button("➕", key=f"add_{idx}", help="افزایش امتیاز"):
-                    data_manager.update_member_points(idx, current_points + 1)
+                    data_manager.update_member_points(idx, current_points + 1, "افزایش یک امتیاز")
                     st.rerun()
                 
                 if st.button("⬆️", key=f"add5_{idx}", help="افزایش 5 امتیاز"):
-                    data_manager.update_member_points(idx, current_points + 5)
+                    data_manager.update_member_points(idx, current_points + 5, "افزایش 5 امتیاز")
                     st.rerun()
             
             with col4:
                 if st.button("➖", key=f"sub_{idx}", help="کاهش امتیاز"):
                     new_points = max(0, current_points - 1)
-                    data_manager.update_member_points(idx, new_points)
+                    data_manager.update_member_points(idx, new_points, "کاهش یک امتیاز")
                     st.rerun()
                 
                 if st.button("⬇️", key=f"sub5_{idx}", help="کاهش 5 امتیاز"):
                     new_points = max(0, current_points - 5)
-                    data_manager.update_member_points(idx, new_points)
+                    data_manager.update_member_points(idx, new_points, "کاهش 5 امتیاز")
                     st.rerun()
             
-            # Custom point adjustment
-            with st.expander("تنظیم دستی امتیاز"):
-                new_points = st.number_input(
-                    "امتیاز جدید:",
-                    min_value=0,
-                    value=current_points,
-                    key=f"custom_points_{idx}"
-                )
+            # Custom point adjustment and history
+            with st.expander("تنظیم دستی امتیاز و تاریخچه"):
+                col_adjust, col_reason = st.columns([2, 3])
                 
-                if st.button("اعمال", key=f"apply_custom_{idx}"):
-                    data_manager.update_member_points(idx, new_points)
+                with col_adjust:
+                    new_points = st.number_input(
+                        "امتیاز جدید:",
+                        min_value=0,
+                        value=current_points,
+                        key=f"custom_points_{idx}"
+                    )
+                
+                with col_reason:
+                    reason = st.text_input(
+                        "دلیل تغییر:",
+                        key=f"reason_{idx}",
+                        placeholder="مثلاً: برگزاری نماز جماعت"
+                    )
+                
+                if st.button("اعمال تغییر", key=f"apply_custom_{idx}"):
+                    data_manager.update_member_points(idx, new_points, reason if reason else "تنظیم دستی")
                     st.rerun()
+                
+                # Display history
+                st.divider()
+                st.write("**📜 تاریخچه امتیازات:**")
+                
+                history = data_manager.get_member_history(idx)
+                if history:
+                    # Show last 10 entries
+                    for entry in reversed(history[-10:]):
+                        change_symbol = "📈" if entry['change'] > 0 else "📉" if entry['change'] < 0 else "➡️"
+                        change_text = f"+{entry['change']}" if entry['change'] > 0 else str(entry['change'])
+                        
+                        st.markdown(f"""
+                        <div style="background: #f0f8f0; padding: 8px; margin: 5px 0; border-radius: 5px; border-right: 3px solid #1f5f3f;">
+                            {change_symbol} <strong>{change_text}</strong> امتیاز 
+                            ({entry['old_points']} ← {entry['new_points']})
+                            <br>
+                            <small>📅 {entry['timestamp']}</small>
+                            <br>
+                            <small>💬 {entry['reason']}</small>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("هنوز تاریخچه‌ای ثبت نشده است.")
+                
+                # Certificate section
+                if level >= 1:
+                    st.divider()
+                    st.write("**🏅 گواهینامه و نشان‌ها:**")
+                    
+                    # Display all earned badges
+                    badges = get_achievement_badges(level)
+                    if badges:
+                        cols = st.columns(min(len(badges), 4))
+                        for i, badge in enumerate(badges):
+                            with cols[i % len(cols)]:
+                                st.markdown(f"""
+                                <div style="background: #e8f5e8; padding: 10px; border-radius: 10px; text-align: center; margin: 5px;">
+                                    <div style="font-size: 40px;">{badge['emoji']}</div>
+                                    <div style="font-size: 14px; font-weight: bold; color: #1f5f3f;">{badge['name']}</div>
+                                    <div style="font-size: 11px; color: #666;">{badge['description']}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                    
+                    # Certificate generation button
+                    if st.button("📜 نمایش گواهینامه", key=f"cert_{idx}"):
+                        member_name = f"{member['first_name']} {member['last_name']}"
+                        cert_date = datetime.now().strftime("%Y/%m/%d")
+                        certificate_html = generate_certificate_html(member_name, level, current_points, cert_date)
+                        st.markdown(certificate_html, unsafe_allow_html=True)
+                        st.info("💡 برای چاپ یا ذخیره، از دکمه Print مرورگر استفاده کنید (Ctrl+P یا Cmd+P)")
             
             st.divider()
     
